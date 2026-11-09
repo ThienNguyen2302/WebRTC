@@ -36,34 +36,36 @@
 
 ## File map
 
-| Path | Responsibility |
-|---|---|
-| `package.json` | Root npm workspace declaration and shared build/test scripts. |
-| `backend/package.json` | NestJS, Prisma, validation, and backend test/build scripts; removes unused Express/Mongoose scaffold dependencies. |
-| `backend/src/main.ts`, `backend/src/app.module.ts` | Nest bootstrap, validation, CORS, and feature module composition. |
-| `backend/src/prisma/` | Prisma module/service and database lifecycle. |
-| `backend/prisma/schema.prisma`, `backend/prisma/migrations/` | PostgreSQL room schema and migrations. |
-| `backend/src/rooms/` | Room controller, DTOs, service, repository, lifecycle errors, and unit/integration tests. |
-| `backend/src/ice/` | Runtime ICE-server configuration endpoint and validation. |
-| `backend/src/signaling/` | Socket.IO gateway, in-memory participant/reconnect state, and gateway tests. |
-| `packages/contracts/` | Browser/server shared Zod schemas and inferred TypeScript types for room and signaling messages. |
-| `frontend/package.json`, `frontend/next.config.ts`, `frontend/tsconfig.json` | Next.js app configuration within the workspace. |
-| `frontend/src/app/page.tsx` | Create-room landing page. |
-| `frontend/src/app/call/[roomId]/page.tsx` | Client-only room route and browser entry point. |
-| `frontend/src/components/` | Call screen, status/error display, local/remote video, and controls. |
-| `frontend/src/lib/api/rooms.ts` | Typed REST room creation and invite URL creation. |
-| `frontend/src/lib/signaling/` | Socket.IO client and typed room event handling. |
-| `frontend/src/lib/webrtc/peer-session.ts` | Browser media acquisition, `RTCPeerConnection` negotiation, controls, and cleanup. |
-| `frontend/src/hooks/use-call-session.ts` | UI-facing call state machine coordinating room, signaling, media, and reconnect. |
-| `frontend/src/**/*.test.ts(x)` | Focused client unit/component tests. |
-| `tests/e2e/`, `playwright.config.ts` | Two-browser Playwright call scenarios and local test server setup. |
-| `compose.yaml` | Local PostgreSQL for development and integration tests. |
-| `backend/.env.example`, `frontend/.env.example` | Non-secret local configuration examples. |
-| `README.md` | Setup, local run instructions, limitations, and verification commands. |
+| Path                                                                         | Responsibility                                                                                                     |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `package.json`                                                               | Root npm workspace declaration and shared build/test scripts.                                                      |
+| `backend/package.json`                                                       | NestJS, Prisma, validation, and backend test/build scripts; removes unused Express/Mongoose scaffold dependencies. |
+| `backend/src/main.ts`, `backend/src/app.module.ts`                           | Nest bootstrap, validation, CORS, and feature module composition.                                                  |
+| `backend/src/prisma/`                                                        | Prisma module/service and database lifecycle.                                                                      |
+| `backend/prisma/schema.prisma`, `backend/prisma/migrations/`                 | PostgreSQL room schema and migrations.                                                                             |
+| `backend/src/rooms/`                                                         | Room controller, DTOs, service, repository, lifecycle errors, and unit/integration tests.                          |
+| `backend/src/rooms/room-expiry.scheduler.ts`                                 | Periodically marks unjoined waiting rooms expired using the repository boundary.                                   |
+| `backend/src/ice/`                                                           | Runtime ICE-server configuration endpoint and validation.                                                          |
+| `backend/src/signaling/`                                                     | Socket.IO gateway, in-memory participant/reconnect state, and gateway tests.                                       |
+| `packages/contracts/`                                                        | Browser/server shared Zod schemas and inferred TypeScript types for room and signaling messages.                   |
+| `frontend/package.json`, `frontend/next.config.ts`, `frontend/tsconfig.json` | Next.js app configuration within the workspace.                                                                    |
+| `frontend/src/app/page.tsx`                                                  | Create-room landing page.                                                                                          |
+| `frontend/src/app/call/[roomId]/page.tsx`                                    | Client-only room route and browser entry point.                                                                    |
+| `frontend/src/components/`                                                   | Call screen, status/error display, local/remote video, and controls.                                               |
+| `frontend/src/lib/api/rooms.ts`                                              | Typed REST room creation and invite URL creation.                                                                  |
+| `frontend/src/lib/signaling/`                                                | Socket.IO client and typed room event handling.                                                                    |
+| `frontend/src/lib/webrtc/peer-session.ts`                                    | Browser media acquisition, `RTCPeerConnection` negotiation, controls, and cleanup.                                 |
+| `frontend/src/hooks/use-call-session.ts`                                     | UI-facing call state machine coordinating room, signaling, media, and reconnect.                                   |
+| `frontend/src/**/*.test.ts(x)`                                               | Focused client unit/component tests.                                                                               |
+| `tests/e2e/`, `playwright.config.ts`                                         | Two-browser Playwright call scenarios and local test server setup.                                                 |
+| `compose.yaml`                                                               | Local PostgreSQL for development and integration tests.                                                            |
+| `backend/.env.example`, `frontend/.env.example`                              | Non-secret local configuration examples.                                                                           |
+| `README.md`                                                                  | Setup, local run instructions, limitations, and verification commands.                                             |
 
 ## Task 1: Create the workspace and runnable app skeleton
 
 **Files:**
+
 - Create: `package.json`, `compose.yaml`
 - Modify: `backend/package.json`
 - Delete: `backend/package-lock.json` (replace it with the root workspace lockfile)
@@ -73,6 +75,7 @@
 - Test: workspace build/typecheck scripts
 
 **Interfaces:**
+
 - Consumes: the existing `backend/` package directory and TypeScript tooling.
 - Produces: npm workspaces `@webrtc/api`, `@webrtc/web`, and `@webrtc/contracts`; `npm run build`, `npm test`, `npm run lint`; Nest listens on `PORT` (default `3001`), Next runs on `3000`.
 
@@ -95,13 +98,19 @@ Create a private root `package.json` with workspaces for the three packages and 
 
 - [ ] **Step 2: Replace the dependency-only backend scaffold with a Nest app skeleton**
 
-Update `backend/package.json` to `@webrtc/api`, remove unused Express/Mongoose/Joi/JWT dependencies, and add Nest core/config/platform/socket dependencies, Prisma, class validation, Nest/Jest tooling, and a `pretest` script that builds `@webrtc/contracts`. Add a `main.ts` that loads environment configuration, enables strict global validation, explicitly configures the web origin, and listens on `PORT` or `3001`; add an empty `AppModule`. Configure `test:integration` as a separate Jest project using a real `DATABASE_URL`.
+Update `backend/package.json` to `@webrtc/api`, remove unused Express/Mongoose/Joi/JWT dependencies, and add Nest core/config/platform/socket/schedule dependencies, Prisma, class validation, Nest/Jest tooling, and a `pretest` script that builds `@webrtc/contracts`. Add a `main.ts` that loads environment configuration, enables strict global validation, explicitly configures the web origin, and listens on `PORT` or `3001`; add an empty `AppModule`. Configure `test:integration` as a separate Jest project using a real `DATABASE_URL`.
 
 ```ts
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
-  app.enableCors({ origin: process.env.WEB_ORIGIN ?? 'http://localhost:3000' });
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+  app.enableCors({ origin: process.env.WEB_ORIGIN ?? "http://localhost:3000" });
   await app.listen(Number(process.env.PORT ?? 3001));
 }
 ```
@@ -142,22 +151,39 @@ git commit -m "build: scaffold WebRTC app workspaces"
 ## Task 2: Define shared room and signaling contracts
 
 **Files:**
+
 - Create: `packages/contracts/src/room.ts`, `packages/contracts/src/signaling.ts`, `packages/contracts/src/index.ts`
 - Test: `packages/contracts/src/__tests__/room.test.ts`, `packages/contracts/src/__tests__/signaling.test.ts`
 - Modify: `packages/contracts/package.json`
 
 **Interfaces:**
+
 - Consumes: `@webrtc/contracts` from Task 1.
-- Produces: `CreateRoomResponse`, `JoinRoomRequest`, `RoomErrorCode`, `IceServerConfig`, `ClientSignal`, `ServerSignal`, `ClientSignalSchema`, and `ServerSignalSchema`; both API and browser use the same runtime schemas.
+- Produces: `CreateRoomResponse`, `JoinRoomRequest`, `RoomErrorCode`, `IceServerConfig`, `ClientSignal`, `ServerSignal`, `SignalAck`, `ClientSignalSchema`, `ServerSignalSchema`, and `SignalAckSchema`; both API and browser use the same runtime schemas.
 
 - [ ] **Step 1: Write failing schema tests**
 
-Test a valid room response, a valid offer envelope, missing required IDs, an unknown signal type, an invalid ICE candidate shape, an unknown object property, and mismatched type/payload pairs such as `offer` with an ICE candidate.
+Test a valid room response, a valid offer envelope, valid and invalid `SignalAck` objects, missing required IDs, an unknown signal type, an invalid ICE candidate shape, an unknown object property, and mismatched type/payload pairs such as `offer` with an ICE candidate.
 
 ```ts
-it('rejects unknown signaling types and extra fields', () => {
-  expect(ClientSignalSchema.safeParse({ type: 'future', id: crypto.randomUUID(), roomId: crypto.randomUUID(), payload: {} }).success).toBe(false);
-  expect(ClientSignalSchema.safeParse({ type: 'endCall', id: crypto.randomUUID(), roomId: crypto.randomUUID(), payload: {}, senderId: 'spoofed' }).success).toBe(false);
+it("rejects unknown signaling types and extra fields", () => {
+  expect(
+    ClientSignalSchema.safeParse({
+      type: "future",
+      id: crypto.randomUUID(),
+      roomId: crypto.randomUUID(),
+      payload: {},
+    }).success,
+  ).toBe(false);
+  expect(
+    ClientSignalSchema.safeParse({
+      type: "endCall",
+      id: crypto.randomUUID(),
+      roomId: crypto.randomUUID(),
+      payload: {},
+      senderId: "spoofed",
+    }).success,
+  ).toBe(false);
 });
 ```
 
@@ -173,22 +199,30 @@ Define `CreateRoomResponse` as UUID `roomId`, string `inviteSecret`, and ISO `ex
 ```ts
 const base = { id: z.string().uuid(), roomId: z.string().uuid() };
 const description = z.object({ sdp: z.string().min(1) }).strict();
-const candidate = z.object({
-  candidate: z.string(),
-  sdpMid: z.string().nullable(),
-  sdpMLineIndex: z.number().int().nullable()
-}).strict();
+const candidate = z
+  .object({
+    candidate: z.string(),
+    sdpMid: z.string().nullable(),
+    sdpMLineIndex: z.number().int().nullable(),
+  })
+  .strict();
 const empty = z.object({}).strict();
 
-export const ClientSignalSchema = z.discriminatedUnion('type', [
-  z.object({ ...base, type: z.literal('offer'), payload: description }).strict(),
-  z.object({ ...base, type: z.literal('answer'), payload: description }).strict(),
-  z.object({ ...base, type: z.literal('iceCandidate'), payload: candidate }).strict(),
-  z.object({ ...base, type: z.literal('endCall'), payload: empty }).strict()
+export const ClientSignalSchema = z.discriminatedUnion("type", [
+  z
+    .object({ ...base, type: z.literal("offer"), payload: description })
+    .strict(),
+  z
+    .object({ ...base, type: z.literal("answer"), payload: description })
+    .strict(),
+  z
+    .object({ ...base, type: z.literal("iceCandidate"), payload: candidate })
+    .strict(),
+  z.object({ ...base, type: z.literal("endCall"), payload: empty }).strict(),
 ]);
 ```
 
-Define `IceServerConfigSchema` for arrays of `{ urls: string | string[], username?: string, credential?: string }`. Define `ServerSignalSchema` with `joined { participantCredential, offerer }`, `peerJoined`, `peerRejoined { offerer }`, `signal { message: ClientSignal }`, `peerLeft`, `roomClosed { reason }`, and `roomError { code: RoomErrorCode }`. Export inferred types from the package entry point.
+Define `IceServerConfigSchema` for arrays of `{ urls: string | string[], username?: string, credential?: string }`. Define `ServerSignalSchema` with `joined { participantCredential, offerer }`, `peerJoined`, `peerRejoined { offerer }`, `signal { message: ClientSignal }`, `peerLeft`, `roomClosed { reason }`, and `roomError { code: RoomErrorCode }`. Define `SignalAckSchema` as a strict object `{ messageId: UUID, accepted: boolean }`; `accepted` is true for a first delivery and an identical duplicate, and false for a rejected or undeliverable signal. Export inferred types from the package entry point.
 
 - [ ] **Step 4: Run the contract tests**
 
@@ -205,11 +239,13 @@ git commit -m "feat: define shared WebRTC signaling contracts"
 ## Task 3: Add PostgreSQL room persistence
 
 **Files:**
+
 - Create: `backend/prisma/schema.prisma`, `backend/src/prisma/prisma.module.ts`, `backend/src/prisma/prisma.service.ts`
 - Create: `backend/src/rooms/rooms.repository.ts`, `backend/src/rooms/rooms.repository.spec.ts`, `backend/src/rooms/rooms.repository.integration.spec.ts`
 - Modify: `backend/src/app.module.ts`, `backend/package.json`
 
 **Interfaces:**
+
 - Consumes: PostgreSQL and Prisma configuration from Task 1.
 - Produces: `RoomsRepository.create(input)`, `findById(id)`, `activate(id)`, `close(id, status)`, `markExpired(id)`, `expireWaitingRooms(now)`, and `closeAllActive()`; a `Room` row stores only ID, invite-secret hash, lifecycle status, timestamps, and expiry.
 
@@ -218,10 +254,10 @@ git commit -m "feat: define shared WebRTC signaling contracts"
 Use an injected Prisma client mock to assert room creation, lookup by ID, activation, and idempotent close. Assert that repository inputs contain only the hashed invite secret and room metadata—not SDP, ICE, media, or account fields.
 
 ```ts
-it('persists only temporary room metadata', async () => {
+it("persists only temporary room metadata", async () => {
   await repository.create({ id: roomId, inviteSecretHash, expiresAt });
   expect(prisma.room.create).toHaveBeenCalledWith({
-    data: { id: roomId, inviteSecretHash, status: 'WAITING', expiresAt }
+    data: { id: roomId, inviteSecretHash, status: "WAITING", expiresAt },
   });
 });
 ```
@@ -281,23 +317,31 @@ git commit -m "feat: persist temporary call rooms in PostgreSQL"
 ## Task 4: Implement room creation and lifecycle service
 
 **Files:**
-- Create: `backend/src/rooms/dto/create-room.dto.ts`, `backend/src/rooms/rooms.controller.ts`, `backend/src/rooms/rooms.service.ts`, `backend/src/rooms/rooms.module.ts`, `backend/src/rooms/rooms.service.spec.ts`, `backend/src/rooms/rooms.controller.spec.ts`
+
+- Create: `backend/src/rooms/dto/create-room.dto.ts`, `backend/src/rooms/rooms.controller.ts`, `backend/src/rooms/rooms.service.ts`, `backend/src/rooms/rooms.module.ts`, `backend/src/rooms/room-expiry.scheduler.ts`, `backend/src/rooms/rooms.service.spec.ts`, `backend/src/rooms/rooms.controller.spec.ts`, `backend/src/rooms/room-expiry.scheduler.spec.ts`
 - Create: `backend/src/ice/ice-config.controller.ts`, `backend/src/ice/ice-config.service.ts`, `backend/src/ice/ice-config.module.ts`, `backend/src/ice/ice-config.service.spec.ts`, `backend/src/ice/ice-config.controller.spec.ts`
 - Modify: `backend/src/app.module.ts`
 
 **Interfaces:**
+
 - Consumes: `RoomsRepository` from Task 3 and shared room response types from Task 2.
-- Produces: `RoomsService.createRoom(): Promise<CreateRoomResponse>`, `verifyInvite(roomId, secret): Promise<Room>`, `activateRoom(roomId): Promise<void>`, and `closeRoom(roomId, status): Promise<void>`; `IceConfigService.getIceServers(): IceServerConfig`; startup closes rooms left `ACTIVE` by a previous process; `POST /rooms` returns a one-time plaintext invite secret only in the creation response.
+- Produces: `RoomsService.createRoom(): Promise<CreateRoomResponse>`, `verifyInvite(roomId, secret): Promise<Room>`, `activateRoom(roomId): Promise<void>`, and `closeRoom(roomId, status): Promise<void>`; `RoomExpiryScheduler.expireWaitingRooms(): Promise<void>` runs once per minute and calls `RoomsRepository.expireWaitingRooms(now)`; `IceConfigService.getIceServers(): IceServerConfig`; startup closes rooms left `ACTIVE` by a previous process; `POST /rooms` returns a one-time plaintext invite secret only in the creation response.
 
 - [ ] **Step 1: Write service tests for secret generation, room expiry, and persistence failure**
 
 Use a mocked repository and fixed clock. Assert a 32-byte cryptographically generated secret is returned once, only its SHA-256 hash is persisted, expiry is read from `ROOM_TTL_SECONDS` (default 1800), the exact expiry boundary is rejected and marked `EXPIRED`, active rooms are closed at process startup, and a repository failure propagates as a service error without returning an invite.
 
 ```ts
-it('rejects an invite at the expiry boundary', async () => {
-  clock.setSystemTime(new Date('2026-11-08T06:30:00Z'));
-  repository.findById.mockResolvedValue({ ...room, status: 'WAITING', expiresAt: new Date('2026-11-08T06:30:00Z') });
-  await expect(service.verifyInvite(room.id, inviteSecret)).rejects.toMatchObject({ code: 'ROOM_EXPIRED' });
+it("rejects an invite at the expiry boundary", async () => {
+  clock.setSystemTime(new Date("2026-11-08T06:30:00Z"));
+  repository.findById.mockResolvedValue({
+    ...room,
+    status: "WAITING",
+    expiresAt: new Date("2026-11-08T06:30:00Z"),
+  });
+  await expect(
+    service.verifyInvite(room.id, inviteSecret),
+  ).rejects.toMatchObject({ code: "ROOM_EXPIRED" });
 });
 ```
 
@@ -314,11 +358,20 @@ Generate the invite secret with `randomBytes(32).toString('base64url')`, persist
 
 Add `POST /rooms` with a strict empty request DTO, returning `{ roomId, inviteSecret, expiresAt }`. Return database and validation failures as explicit non-2xx errors; never return a success response with empty room fields.
 
-- [ ] **Step 5: Add runtime ICE configuration**
+- [ ] **Step 5: Expire unjoined rooms on schedule**
+
+Register `ScheduleModule.forRoot()` once in `AppModule`. Implement `RoomExpiryScheduler.expireWaitingRooms()` with `@Cron(CronExpression.EVERY_MINUTE)` and inject `RoomsRepository`; pass the current time to `expireWaitingRooms(now)`. Keep `verifyInvite()`'s expiry-boundary check as the authoritative join guard so correctness does not depend on scheduler timing.
+
+Test that the scheduler calls the repository with the current time and propagates repository failures. Test that a room at its expiry boundary is rejected even when the scheduled job has not run.
+
+Run: `npm test --workspace @webrtc/api -- room-expiry.scheduler.spec.ts rooms.service.spec.ts --runInBand`
+Expected: scheduler and expiry-boundary tests pass.
+
+- [ ] **Step 6: Add runtime ICE configuration**
 
 Parse and validate `ICE_SERVERS_JSON` in `IceConfigService` with `IceServerConfigSchema`. Add `GET /ice-servers` to return the validated runtime config so the frontend does not bake TURN credentials into its bundle. For this MVP, document STUN-only defaults; do not log ICE configuration or pretend static TURN credentials are production-safe.
 
-- [ ] **Step 6: Test API contract and PostgreSQL failure**
+- [ ] **Step 7: Test API contract and PostgreSQL failure**
 
 Test response shape and status, invalid request rejection, malformed ICE environment config, and mocked repository outage. Add an integration test that creates a real room against PostgreSQL and verifies that the row contains the hash, not the plaintext secret.
 
@@ -328,7 +381,7 @@ Expected: unit and controller tests pass; repository/database outage maps to an 
 Run: `npm run test:integration --workspace @webrtc/api`
 Expected: a room created through the real repository stores only the invite-secret hash.
 
-- [ ] **Step 7: Commit room creation**
+- [ ] **Step 8: Commit room creation**
 
 ```text
 git add backend/src/rooms backend/src/app.module.ts packages/contracts
@@ -338,25 +391,31 @@ git commit -m "feat: create and validate temporary call rooms"
 ## Task 5: Implement validated Socket.IO signaling and reconnect
 
 **Files:**
+
 - Create: `backend/src/signaling/signaling.module.ts`, `backend/src/signaling/signaling.gateway.ts`, `backend/src/signaling/room-presence.ts`, `backend/src/signaling/signaling.gateway.spec.ts`
 - Modify: `backend/src/app.module.ts`, `backend/src/rooms/rooms.service.ts`
 
 **Interfaces:**
+
 - Consumes: `RoomsService.verifyInvite/activateRoom/closeRoom` and shared `JoinRoomRequest`, `ClientSignal`, and `ServerSignal` types.
-- Produces: `RoomGateway` events `joinRoom`, `signal`, and `leaveRoom`; emits `joined`, `peerJoined`, `peerRejoined`, `signal`, `peerLeft`, `roomClosed`, and `roomError`. Presence is limited to two slots and reserves a disconnected slot for 60 seconds.
+- Produces: `RoomGateway` events `joinRoom`, `signal`, and `leaveRoom`; emits `joined`, `peerJoined`, `peerRejoined`, `signal`, `peerLeft`, `roomClosed`, and `roomError`. The `signal` event accepts a Socket.IO acknowledgment callback returning `SignalAck`; presence is limited to two slots and reserves a disconnected slot for 60 seconds.
 
 - [ ] **Step 1: Write gateway tests for authorization, capacity, and cross-room rejection**
 
 Cover invalid invite, unknown/expired room, a third participant, a signal with an unjoined room ID, a client-supplied sender field, and a conflicting payload that reuses a message ID. Assert invalid messages are not emitted to any socket.
 
 ```ts
-it('admits only one of two concurrent third-party join attempts', async () => {
+it("admits only one of two concurrent third-party join attempts", async () => {
   await Promise.all([
     gateway.joinRoom(socketC, validJoin),
-    gateway.joinRoom(socketD, validJoin)
+    gateway.joinRoom(socketD, validJoin),
   ]);
-  expect([socketC, socketD].filter(socket => socket.received('joined'))).toHaveLength(1);
-  expect([socketC, socketD].filter(socket => socket.received('roomError'))).toHaveLength(1);
+  expect(
+    [socketC, socketD].filter((socket) => socket.received("joined")),
+  ).toHaveLength(1);
+  expect(
+    [socketC, socketD].filter((socket) => socket.received("roomError")),
+  ).toHaveLength(1);
 });
 ```
 
@@ -373,7 +432,7 @@ Configure the gateway CORS allowlist from `WEB_ORIGIN`; do not accept arbitrary 
 
 - [ ] **Step 4: Implement validated, acknowledged, idempotent signaling**
 
-Validate every signal with `ClientSignalSchema`, require matching room membership, and relay only to the other admitted participant. Acknowledge after validation and relay; cache each `(participant slot, message ID, payload hash)` per active room so an identical retry is not relayed twice and reuse of the same ID with different content is rejected. Return explicit `ROOM_NOT_FOUND`, `ROOM_EXPIRED`, `ROOM_FULL`, `NOT_AUTHORIZED`, or `INVALID_MESSAGE` errors.
+Validate every signal with `ClientSignalSchema`, require matching room membership, and relay only to the other admitted participant. Acknowledge with `SignalAck` after validation and relay; cache each `(participant slot, message ID, payload hash)` per active room so an identical retry is acknowledged but not relayed twice and reuse of the same ID with different content is rejected with `accepted: false`. Return explicit `ROOM_NOT_FOUND`, `ROOM_EXPIRED`, `ROOM_FULL`, `NOT_AUTHORIZED`, or `INVALID_MESSAGE` errors through `roomError`.
 
 - [ ] **Step 5: Implement leave, reconnect grace, and cleanup**
 
@@ -381,7 +440,7 @@ On transient disconnect, notify the peer, reserve the participant slot for confi
 
 - [ ] **Step 6: Test concurrent joins, duplicate messages, and reconnect timer behavior**
 
-Use fake timers and parallel join attempts to prove only one third-party socket can be admitted, an identical duplicate ID is relayed once, a conflicting duplicate is rejected, the correct participant can reclaim within 60 seconds, the first participant remains the offerer after reconnect, and an expired reservation closes the room. Include a room-ID spoof test.
+Use fake timers and parallel join attempts to prove only one third-party socket can be admitted, an identical duplicate ID is acknowledged and relayed once, a conflicting duplicate is rejected, the correct participant can reclaim within 60 seconds, the first participant remains the offerer after reconnect, and an expired reservation closes the room. Include a room-ID spoof test and assert every failure produces an explicit acknowledgment or `roomError`, never a silent drop.
 
 Run: `npm test --workspace @webrtc/api -- signaling.gateway.spec.ts --runInBand`
 Expected: PASS for both normal and adversarial signaling cases.
@@ -396,10 +455,12 @@ git commit -m "feat: relay authorized WebRTC signaling"
 ## Task 6: Build the web room-entry and call-screen shell
 
 **Files:**
+
 - Create: `frontend/src/app/call/[roomId]/page.tsx`, `frontend/src/components/create-room-button.tsx`, `frontend/src/components/call-client.tsx`, `frontend/src/components/call-status.tsx`, `frontend/src/lib/api/rooms.ts`, `frontend/src/lib/api/rooms.test.ts`
 - Modify: `frontend/src/app/page.tsx`, `frontend/src/app/globals.css`, `frontend/.env.example`
 
 **Interfaces:**
+
 - Consumes: `POST /rooms` from Task 4 and `CreateRoomResponse` from `@webrtc/contracts`.
 - Produces: `createRoom(): Promise<CreateRoomResponse>` and `createInviteUrl(roomId, inviteSecret, origin): string`; a client-only call route receives `roomId` and reads the invite secret from the URL fragment.
 
@@ -408,9 +469,12 @@ git commit -m "feat: relay authorized WebRTC signaling"
 Test that `createRoom` sends `POST` to `NEXT_PUBLIC_API_URL/rooms`, parses a valid response, and throws an explicit error on non-2xx or malformed JSON.
 
 ```ts
-it('does not return a room when the API fails', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('unavailable', { status: 503 })));
-  await expect(createRoom()).rejects.toThrow('ROOM_CREATE_FAILED');
+it("does not return a room when the API fails", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(new Response("unavailable", { status: 503 })),
+  );
+  await expect(createRoom()).rejects.toThrow("ROOM_CREATE_FAILED");
 });
 ```
 
@@ -440,10 +504,12 @@ git commit -m "feat: add WebRTC room entry pages"
 ## Task 7: Implement browser media and peer-session lifecycle
 
 **Files:**
+
 - Create: `frontend/src/lib/webrtc/peer-session.ts`, `frontend/src/lib/webrtc/peer-session.test.ts`, `frontend/src/lib/webrtc/media.ts`
 - Modify: `frontend/package.json`
 
 **Interfaces:**
+
 - Consumes: shared `ClientSignal` and `ServerSignal` types from Task 2.
 - Produces: `createPeerSession(options): Promise<PeerSession>`; `PeerSession` exposes `localStream`, `startOffer()`, `receive(signal: NegotiationSignal)`, `setMicrophoneEnabled(enabled)`, `setCameraEnabled(enabled)`, and idempotent `close()`. `NegotiationSignal` is the shared offer/answer/ICE subset; end-call messages are handled by the call controller.
 
@@ -452,11 +518,13 @@ git commit -m "feat: add WebRTC room entry pages"
 Test denied permission, unavailable `navigator.mediaDevices`, local stream acquisition, peer-connection construction failure after stream acquisition, offer creation, answer handling, ICE arriving before remote description, mic/camera toggles, remote stream delivery, and repeated cleanup. Verify any acquired tracks stop if a later setup step fails.
 
 ```ts
-it('stops acquired tracks when peer construction fails', async () => {
+it("stops acquired tracks when peer construction fails", async () => {
   const track = makeFakeTrack();
   mediaDevices.getUserMedia.mockResolvedValue(makeStream(track));
-  peerConnectionFactory.mockImplementation(() => { throw new Error('PEER_SETUP_FAILED'); });
-  await expect(createPeerSession(options)).rejects.toThrow('PEER_SETUP_FAILED');
+  peerConnectionFactory.mockImplementation(() => {
+    throw new Error("PEER_SETUP_FAILED");
+  });
+  await expect(createPeerSession(options)).rejects.toThrow("PEER_SETUP_FAILED");
   expect(track.stop).toHaveBeenCalledTimes(1);
 });
 ```
@@ -493,22 +561,28 @@ git commit -m "feat: add browser WebRTC peer session"
 ## Task 8: Connect room signaling to the call UI
 
 **Files:**
+
 - Create: `frontend/src/lib/signaling/socket-client.ts`, `frontend/src/hooks/use-call-session.ts`, `frontend/src/components/call-controls.tsx`, `frontend/src/components/video-stage.tsx`, `frontend/src/hooks/use-call-session.test.tsx`
 - Modify: `frontend/src/components/call-client.tsx`, `frontend/src/components/call-status.tsx`
 
 **Interfaces:**
+
 - Consumes: NestJS Socket.IO events from Task 5 and `createPeerSession` from Task 7.
-- Produces: `useCallSession({ roomId, inviteSecret })` with states `joining`, `requestingMedia`, `waiting`, `connecting`, `connected`, `reconnecting`, `ended`, and `error`; exposes local/remote streams, mute/camera toggles, and `endCall()`.
+- Produces: `useCallSession({ roomId, inviteSecret })` with states `joining`, `requestingMedia`, `waiting`, `connecting`, `connected`, `reconnecting`, `ended`, and `error`; exposes local/remote streams, mute/camera toggles, and `endCall()`. Participant credentials are stored in `sessionStorage` under a room-specific key and reused only for that room in the same tab session.
 
 - [ ] **Step 1: Write hook tests for join state and listener-before-offer ordering**
 
 Use a mock Socket.IO client and peer session. Assert listeners are registered before `joinRoom` is sent, the first participant waits, and the offerer starts negotiation only after `peerJoined`.
 
 ```ts
-it('registers signal listeners before joining and offers only when designated', async () => {
+it("registers signal listeners before joining and offers only when designated", async () => {
   const session = renderHook(() => useCallSession({ roomId, inviteSecret }));
-  expect(socket.on.mock.invocationCallOrder[0]).toBeLessThan(socket.emit.mock.invocationCallOrder[0]);
-  act(() => socket.serverEmit('joined', { participantCredential, offerer: false }));
+  expect(socket.on.mock.invocationCallOrder[0]).toBeLessThan(
+    socket.emit.mock.invocationCallOrder[0],
+  );
+  act(() =>
+    socket.serverEmit("joined", { participantCredential, offerer: false }),
+  );
   expect(peer.startOffer).not.toHaveBeenCalled();
 });
 ```
@@ -520,11 +594,11 @@ Expected: FAIL because the call hook and signaling client do not exist.
 
 - [ ] **Step 3: Implement typed signaling client**
 
-Connect to `NEXT_PUBLIC_SIGNALING_URL`, validate every incoming event with shared schemas, send acknowledgements with stable message IDs, retry unacknowledged messages using the same ID, and expose explicit server error codes. Never log invite secrets or signaling payloads.
+Connect to `NEXT_PUBLIC_SIGNALING_URL`, validate every incoming event and acknowledgment with shared schemas, and send signals with stable message IDs. If an acknowledgment is missing, retry the same message ID up to two times, waiting 500 ms then 1 second; after the third unacknowledged attempt, reject with an explicit delivery error so the call state machine can transition to `error`. Expose explicit server error codes. Never log invite secrets or signaling payloads.
 
 - [ ] **Step 4: Implement the call state machine**
 
-Register all event listeners before joining. Obtain or reuse the session-scoped participant credential, create the peer session after the user accepts media permission, and coordinate offer/answer/ICE messages. On `peerRejoined`, reset the old peer session; only the original first-slot participant (the designated offerer) starts the new offer. On the 60-second timeout or room-close event, transition to a terminal state.
+Request media only after the user presses the join action. If permission is denied or media APIs are unavailable, show an actionable error and do not occupy a room slot. Once media is ready, register all signaling listeners before sending `joinRoom`; include the invite secret and any credential from `sessionStorage` key `webrtc:participant:{roomId}`. Save the returned credential under that key. Coordinate offer/answer/ICE messages. On `peerRejoined`, reset the old peer session; only the original first-slot participant (the designated offerer) starts the new offer. On the 60-second timeout or room-close event, transition to a terminal state.
 
 - [ ] **Step 5: Implement the call controls and media stage**
 
@@ -547,10 +621,12 @@ git commit -m "feat: connect browser call UI to signaling"
 ## Task 9: Verify the two-browser call and document local use
 
 **Files:**
+
 - Create: `tests/e2e/webrtc-call.spec.ts`, `playwright.config.ts`
 - Modify: `package.json`, `README.md`
 
 **Interfaces:**
+
 - Consumes: working Next.js, NestJS, PostgreSQL, and signaling contract from Tasks 1–8.
 - Produces: `npm run test:e2e` that runs the actual room creation/join flow in two browser contexts and a README that reproduces the local demo.
 
@@ -563,23 +639,33 @@ Add Playwright as a root development dependency and a root `test:e2e` script. Co
 Test that browser A creates a room, browser B joins the copied link, both reach connected state, both render a remote video track, mute/camera toggles update UI state, and ending from either browser closes the other side. Add separate invalid/expired invite and camera/microphone-denied tests.
 
 ```ts
-test('two browsers connect and end the temporary call', async ({ browser }) => {
-  const caller = await browser.newContext({ permissions: ['camera', 'microphone'] });
-  const guest = await browser.newContext({ permissions: ['camera', 'microphone'] });
+test("two browsers connect and end the temporary call", async ({ browser }) => {
+  const caller = await browser.newContext({
+    permissions: ["camera", "microphone"],
+  });
+  const guest = await browser.newContext({
+    permissions: ["camera", "microphone"],
+  });
   const callerPage = await caller.newPage();
   const guestPage = await guest.newPage();
-  await callerPage.goto('/');
-  await callerPage.getByRole('button', { name: 'Create call' }).click();
-  const inviteUrl = await callerPage.getByRole('link', { name: 'Copy invite link' }).getAttribute('href');
-  if (!inviteUrl) throw new Error('INVITE_LINK_MISSING');
+  await callerPage.goto("/");
+  await callerPage.getByRole("button", { name: "Create call" }).click();
+  const inviteUrl = await callerPage
+    .getByRole("link", { name: "Copy invite link" })
+    .getAttribute("href");
+  if (!inviteUrl) throw new Error("INVITE_LINK_MISSING");
   await guestPage.goto(inviteUrl);
-  await expect(callerPage.getByTestId('call-status')).toHaveText('Connected');
-  await expect(guestPage.getByTestId('call-status')).toHaveText('Connected');
-  await expect.poll(() => callerPage.getByTestId('remote-video').evaluate(
-    (video: HTMLVideoElement) => video.videoWidth > 0
-  )).toBe(true);
-  await callerPage.getByRole('button', { name: 'End call' }).click();
-  await expect(guestPage.getByTestId('call-status')).toHaveText('Call ended');
+  await expect(callerPage.getByTestId("call-status")).toHaveText("Connected");
+  await expect(guestPage.getByTestId("call-status")).toHaveText("Connected");
+  await expect
+    .poll(() =>
+      callerPage
+        .getByTestId("remote-video")
+        .evaluate((video: HTMLVideoElement) => video.videoWidth > 0),
+    )
+    .toBe(true);
+  await callerPage.getByRole("button", { name: "End call" }).click();
+  await expect(guestPage.getByTestId("call-status")).toHaveText("Call ended");
   await caller.close();
   await guest.close();
 });
@@ -622,7 +708,7 @@ git commit -m "test: verify WebRTC call flow in two browsers"
 - Next.js client-only boundary and actionable media errors: Tasks 6–8.
 - NestJS REST room creation, validation, explicit errors, and service/repository boundary: Tasks 1, 3, and 4.
 - PostgreSQL room metadata, Prisma migrations, and persistence failure behavior: Tasks 3–4.
-- Two-person room admission, invite capability, 30-minute waiting expiry, 60-second reconnect, restart behavior: Tasks 4–5.
-- Typed signaling, sender identity, acknowledgements, retry IDs, deduplication, malformed input, and no SDP/ICE persistence: Tasks 2 and 5.
+- Two-person room admission, invite capability, scheduled 30-minute waiting expiry, 60-second reconnect, tab-scoped participant credential, and restart behavior: Tasks 4–5 and 8.
+- Typed signaling, sender identity, validated acknowledgments, bounded same-ID retries, deduplication, malformed input, and no SDP/ICE persistence: Tasks 2, 5, and 8.
 - Direct browser-to-browser media, offer/answer/ICE ordering, controls, teardown: Tasks 7–8.
 - Two-browser end-to-end verification, setup documentation, and explicit MVP limitations: Task 9.
