@@ -1,0 +1,25 @@
+{
+  "name": "webrtc-learning",
+  "private": true,
+  "workspaces": [
+    "packages/contracts",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @webrtc/contracts && npm run build --workspace @webrtc/api && npm run build --workspace @webrtc/web",
+    "test": "npm test --workspace @webrtc/contracts && npm test --workspace @webrtc/api && npm run test:integration --workspace @webrtc/api && npm test --workspace @webrtc/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "test:e2e": "echo \"E2E suite not implemented yet\" && exit 1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^12.0.12",
+    "rxjs": "^7.8.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1",
+    "deepmerge": "^4.3.1"
+  }
+}

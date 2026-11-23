@@ -43,9 +43,19 @@ This is a monorepo for a WebRTC learning MVP.
 ## Build and verification
 
 - Root build: `npm run build`
-- Root test: `npm test`
-- Backend-specific build/test: `npm run build --workspace @webrtc/api` and `npm test --workspace @webrtc/api`
-- Frontend-specific test: `npm test --workspace @webrtc/web`
+- Contracts test: `npm test --workspace @webrtc/contracts`
+- Backend unit test: `npm test --workspace @webrtc/api`
+- Frontend unit test: `npm test --workspace @webrtc/web`
+- Run one Vitest file by adding its path after `--`, for example `npm test --workspace @webrtc/api -- src/rooms/rooms.service.spec.ts`
+- Root lint: `npm run lint`
+- Root `npm test` is currently incomplete because it invokes a missing backend `test:integration` script
+- Start PostgreSQL with `docker compose up -d postgres`; stop it with `docker compose down`
+- Copy `backend/.env.example` to `backend/.env` and `frontend/.env.example` to `frontend/.env.local`
+- Generate the Prisma client with `npm exec -- prisma generate --schema backend/prisma/schema.prisma`
+- Build contracts before starting app workspaces: `npm run build --workspace @webrtc/contracts`
+- Start API: `npm run start:dev --workspace @webrtc/api`
+- Start web: `npm run dev --workspace @webrtc/web`
+- No Prisma migrations are currently committed; do not invent or document migration commands until migrations exist
 - Use focused checks first, then broader verification, and report any pre-existing failures explicitly.
 
 ## Change discipline
