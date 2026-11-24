@@ -50,8 +50,12 @@ export class RoomsService implements OnModuleInit {
             throw new RoomServiceError('ROOM_NOT_FOUND');
         }
 
-        const expiresAt = new Date(room.expiresAt);
-        if (room.status === 'EXPIRED' || room.status === 'CLOSED' || expiresAt.getTime() <= Date.now()) {
+        if (room.status === 'EXPIRED' || room.status === 'CLOSED') {
+            throw new RoomServiceError('ROOM_EXPIRED');
+        }
+
+        if (room.status === 'WAITING' && new Date(room.expiresAt).getTime() <= Date.now()) {
+            await this.roomsRepository.markExpired(roomId);
             throw new RoomServiceError('ROOM_EXPIRED');
         }
 

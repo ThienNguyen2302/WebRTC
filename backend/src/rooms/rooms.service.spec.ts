@@ -1,16 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 
 import { RoomsService } from './rooms.service';
 
 describe('RoomsService', () => {
     const roomId = '2d9c6d8a-5c6c-48b8-b4fa-dc3ccdb88a2d';
-    const inviteSecret = 'aVeryLongInviteSecretThatMatchesTheContract123';
     const repo = {
         create: vi.fn(),
         findById: vi.fn(),
         activate: vi.fn(),
         close: vi.fn(),
+        markExpired: vi.fn(),
         closeAllActive: vi.fn(),
     };
 
@@ -27,6 +27,10 @@ describe('RoomsService', () => {
         vi.clearAllMocks();
     });
 
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it('creates a room and persists only the invite hash', async () => {
         repo.create.mockResolvedValue({
             id: roomId,
@@ -38,16 +42,57 @@ describe('RoomsService', () => {
         const result = await service.createRoom();
 
         expect(result.roomId).toBeDefined();
-        expect(result.inviteSecret).toBeTruthy();
+        expect(Buffer.from(result.inviteSecret, 'base64url')).toHaveLength(32);
         expect(result.expiresAt).toBeTruthy();
+        const persistedRoom = repo.create.mock.calls[0][0];
+        expect(persistedRoom).toMatchObject({
+            id: result.roomId,
+            inviteSecretHash: createHash('sha256').update(result.inviteSecret).digest('hex'),
+            expiresAt: expect.any(Date),
+        });
+        expect(persistedRoom).not.toHaveProperty('inviteSecret');
+    });
+
+    it('uses the configured waiting-room TTL', async () => {
+        const now = new Date('2026-11-24T09:00:00.000Z');
+        vi.useFakeTimers();
+        vi.setSystemTime(now);
+        config.get.mockReturnValueOnce(45);
+
+        await service.createRoom();
+
         expect(repo.create).toHaveBeenCalledWith(
             expect.objectContaining({
-                id: result.roomId,
-                inviteSecretHash: expect.any(String),
-                expiresAt: expect.any(Date),
+                expiresAt: new Date(now.getTime() + 45_000),
             }),
         );
-        expect(repo.create.mock.calls[0][0].inviteSecretHash).not.toBe(inviteSecret);
+    });
+
+    it('uses a 30-minute waiting-room TTL by default', async () => {
+        const now = new Date('2026-11-24T09:00:00.000Z');
+        vi.useFakeTimers();
+        vi.setSystemTime(now);
+
+        await service.createRoom();
+
+        expect(repo.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                expiresAt: new Date(now.getTime() + 1_800_000),
+            }),
+        );
+    });
+
+    it('closes active rooms left by a previous process during startup', async () => {
+        await service.onModuleInit();
+
+        expect(repo.closeAllActive).toHaveBeenCalledOnce();
+    });
+
+    it('propagates persistence failure instead of returning an invite', async () => {
+        const error = new Error('database unavailable');
+        repo.create.mockRejectedValueOnce(error);
+
+        await expect(service.createRoom()).rejects.toBe(error);
     });
 
     it('rejects rooms that have expired at the boundary', async () => {
@@ -61,6 +106,7 @@ describe('RoomsService', () => {
         });
 
         await expect(service.verifyInvite(roomId, 'secret')).rejects.toMatchObject({ code: 'ROOM_EXPIRED' });
+        expect(repo.markExpired).toHaveBeenCalledWith(roomId);
 
         vi.useRealTimers();
     });
@@ -80,5 +126,20 @@ describe('RoomsService', () => {
         await expect(service.verifyInvite(roomId, validSecret)).resolves.toMatchObject({ id: roomId });
 
         expect(repo.activate).not.toHaveBeenCalled();
+    });
+
+    it('does not expire an active room when the waiting-room TTL has passed', async () => {
+        const validSecret = 'abcdefghijklmnopqrstuvwxyz1234567890abcde';
+        const digest = createHash('sha256').update(validSecret).digest('hex');
+        repo.findById.mockResolvedValue({
+            id: roomId,
+            inviteSecretHash: digest,
+            status: 'ACTIVE',
+            expiresAt: new Date('2020-01-01T00:00:00.000Z'),
+        });
+
+        await expect(service.verifyInvite(roomId, validSecret)).resolves.toMatchObject({ id: roomId });
+
+        expect(repo.markExpired).not.toHaveBeenCalled();
     });
 });

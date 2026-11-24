@@ -97,6 +97,20 @@ describe('HTTP API', () => {
     }
   });
 
+  it('rejects syntactically invalid runtime ICE JSON', async () => {
+    vi.stubEnv('ICE_SERVERS_JSON', 'not-json');
+    const app = await createApp({ closeAllActive: vi.fn() });
+
+    try {
+      await request(app.getHttpServer())
+        .get('/ice-servers')
+        .expect(500)
+        .expect(({ body }) => expect(body.message).toBe('ICE_CONFIGURATION_INVALID'));
+    } finally {
+      await app.close();
+    }
+  });
+
   it('returns a server error when room persistence fails', async () => {
     const app = await createApp({
       create: vi.fn().mockRejectedValue(new Error('database unavailable')),
