@@ -52,14 +52,16 @@ export class RoomsRepository {
     });
   }
 
-  async markExpired(id: string): Promise<RoomRecord> {
-    return this.prisma.room.update({
-      where: { id },
+  async markExpired(id: string): Promise<{ count: number }> {
+    const result = await this.prisma.room.updateMany({
+      where: { id, status: 'WAITING' },
       data: {
         status: 'EXPIRED',
         closedAt: new Date(),
       },
     });
+
+    return { count: result.count };
   }
 
   async expireWaitingRooms(now: Date): Promise<{ count: number }> {

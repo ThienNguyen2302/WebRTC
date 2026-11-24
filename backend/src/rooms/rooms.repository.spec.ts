@@ -81,4 +81,19 @@ describe('RoomsRepository', () => {
       },
     });
   });
+
+  it('expires only waiting rooms so a concurrent activation is preserved', async () => {
+    const roomId = '2d9c6d8a-5c6c-48b8-b4fa-dc3ccdb88a2d';
+    prisma.room.updateMany.mockResolvedValue({ count: 1 });
+
+    await repository.markExpired(roomId);
+
+    expect(prisma.room.updateMany).toHaveBeenCalledWith({
+      where: { id: roomId, status: 'WAITING' },
+      data: {
+        status: 'EXPIRED',
+        closedAt: expect.any(Date),
+      },
+    });
+  });
 });
