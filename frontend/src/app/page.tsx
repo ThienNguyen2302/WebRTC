@@ -1,8 +1,18 @@
+import { CreateRoomButton } from '../components/create-room-button';
+
 export default function HomePage() {
   return (
-    <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <h1>WebRTC Learning MVP</h1>
-      <p>Workspace scaffold is ready for the room flow implementation.</p>
+    <main className="home-shell">
+      <section className="hero-card">
+        <p className="eyebrow">One-to-one, peer-to-peer</p>
+        <h1>Make a private video call</h1>
+        <p className="hero-copy">
+          Create a temporary room and share its invite link with one person. Your media stays
+          between browsers.
+        </p>
+        <CreateRoomButton />
+        <p className="privacy-note">Camera and microphone access is requested only when you join.</p>
+      </section>
     </main>
   );
 }
