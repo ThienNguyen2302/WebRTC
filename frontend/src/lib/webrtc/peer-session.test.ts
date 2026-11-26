@@ -273,7 +273,7 @@ describe('browser peer session', () => {
 
     expect(onRemoteStream).toHaveBeenCalledWith(remoteStream);
     expect(onConnectionStateChange).toHaveBeenCalledWith('connected');
-    await session.close();
+    session.close();
   });
 
   it('reports asynchronous ICE delivery failures instead of leaving a rejected promise', async () => {
@@ -295,7 +295,7 @@ describe('browser peer session', () => {
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({
       message: 'SIGNALING_DELIVERY_FAILED',
     }));
-    await session.close();
+    session.close();
   });
 
   it('closes resources only once and releases peer event handlers', async () => {
@@ -304,8 +304,8 @@ describe('browser peer session', () => {
     const session = await createPeerSession(makeOptions());
     const peerConnection = FakePeerConnection.instances[0];
 
-    await session.close();
-    await session.close();
+    session.close();
+    session.close();
 
     expect(audioTrack.stop).toHaveBeenCalledTimes(1);
     expect(peerConnection?.close).toHaveBeenCalledTimes(1);

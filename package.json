@@ -10,10 +10,11 @@
     "build": "npm run build --workspace @webrtc/contracts && npm run build --workspace @webrtc/api && npm run build --workspace @webrtc/web",
     "test": "npm test --workspace @webrtc/contracts && npm test --workspace @webrtc/api && npm run test:integration --workspace @webrtc/api && npm test --workspace @webrtc/web",
     "lint": "npm run lint --workspaces --if-present",
-    "test:e2e": "echo \"E2E suite not implemented yet\" && exit 1"
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.12",
+    "@playwright/test": "^1.65.1",
     "rxjs": "^7.8.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.8"

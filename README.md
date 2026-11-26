@@ -7,7 +7,7 @@ in PostgreSQL through Prisma. Browser media is sent peer-to-peer with
 
 ## Prerequisites
 
-- Node.js and npm
+- Node.js 20.9+ and npm
 - Docker with Docker Compose
 
 ## Install
@@ -19,6 +19,7 @@ npm install
 copy backend\.env.example backend\.env
 copy frontend\.env.example frontend\.env.local
 docker compose up -d postgres
+npm exec -- prisma migrate deploy --schema backend/prisma/schema.prisma
 npm exec -- prisma generate --schema backend/prisma/schema.prisma
 npm run build --workspace @webrtc/contracts
 ```
@@ -31,8 +32,8 @@ user: postgres
 password: postgres
 ```
 
-No Prisma migrations are currently committed. Do not run a migration command
-until migrations have been added for the room schema.
+The initial room-schema migration is committed. `migrate deploy` applies it to
+the configured database without creating a new migration.
 
 ## Start the applications
 
@@ -77,9 +78,9 @@ npm run build --workspace @webrtc/api
 npm run build --workspace @webrtc/web
 ```
 
-## Unit tests
+## Tests
 
-Run the currently configured unit-test suites separately:
+Run the unit-test suites separately:
 
 ```powers
 npm test --workspace @webrtc/contracts
@@ -103,12 +104,30 @@ npm run test:watch --workspace @webrtc/api
 npm run test:cov --workspace @webrtc/api
 ```
 
-The root `npm test` script currently references a backend
-`test:integration` script that is not present, so it is not a runnable
-full-suite command yet.
+The backend integration suite requires a reachable PostgreSQL database set in
+`DATABASE_URL` and a migrated schema:
 
-The backend E2E config is present, but the repository is missing a runnable
-integration-script definition and browser test suite.
+```powershell
+npm run test:integration --workspace @webrtc/api
+```
+
+### Two-browser Playwright test
+
+The browser suite uses fake camera/microphone devices and needs its own local
+database. Create it once:
+
+```powershell
+docker compose exec postgres createdb -U postgres webrtc_e2e
+$env:E2E_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/webrtc_e2e"
+$env:DATABASE_URL = $env:E2E_DATABASE_URL
+npm exec -- prisma migrate deploy --schema backend/prisma/schema.prisma
+npm run test:e2e
+```
+
+The e2e setup refuses databases that are not on localhost or whose name does
+not end in `_e2e`. Playwright starts the API and web app automatically. If
+Playwright's Chromium browser is not installed yet, install it with
+`npx playwright install chromium`.
 
 ## Lint
 
@@ -125,6 +144,19 @@ npm run lint --workspace @webrtc/contracts
 npm run lint --workspace @webrtc/api
 npm run lint --workspace @webrtc/web
 ```
+
+Browser camera/microphone prompts require user permission in normal browsing.
+The Playwright suite uses synthetic media and does not require physical devices.
+
+## Known limitations
+
+- The local ICE example is STUN-only. Calls may fail across restrictive NATs or
+  firewalls; configure a production TURN service before relying on calls outside
+  a local/demo network.
+- Signaling presence is held in memory by one API instance. Multi-instance
+  routing and group calls are not supported.
+- Rooms are temporary and intended for two anonymous participants. Accounts,
+  chat, and media storage are out of scope.
 
 ## Repository layout
 

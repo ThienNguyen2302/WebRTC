@@ -96,7 +96,7 @@ describe('useCallSession', () => {
   });
 
   afterEach(() => {
-    for (const unmount of [...mountedRoots]) {
+    for (const unmount of mountedRoots) {
       unmount();
     }
     vi.useRealTimers();
