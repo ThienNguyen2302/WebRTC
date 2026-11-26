@@ -42,6 +42,10 @@ function makeConnectionStateMock() {
   return vi.fn((_state: RTCPeerConnectionState) => undefined);
 }
 
+function makeErrorMock() {
+  return vi.fn((_error: Error) => undefined);
+}
+
 class FakePeerConnection {
   static instances: FakePeerConnection[] = [];
 
@@ -104,6 +108,7 @@ describe('browser peer session', () => {
   let onSignal: ReturnType<typeof makeSignalMock>;
   let onRemoteStream: ReturnType<typeof makeRemoteStreamMock>;
   let onConnectionStateChange: ReturnType<typeof makeConnectionStateMock>;
+  let onError: ReturnType<typeof makeErrorMock>;
 
   beforeEach(() => {
     events.length = 0;
@@ -112,6 +117,7 @@ describe('browser peer session', () => {
     onSignal = makeSignalMock();
     onRemoteStream = makeRemoteStreamMock();
     onConnectionStateChange = makeConnectionStateMock();
+    onError = makeErrorMock();
 
     vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://api.example.test');
     vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
@@ -133,7 +139,7 @@ describe('browser peer session', () => {
   });
 
   function makeOptions() {
-    return { roomId, onSignal, onRemoteStream, onConnectionStateChange };
+    return { roomId, onSignal, onRemoteStream, onConnectionStateChange, onError };
   }
 
   it('requests audio and video after media is available', async () => {
@@ -267,6 +273,28 @@ describe('browser peer session', () => {
 
     expect(onRemoteStream).toHaveBeenCalledWith(remoteStream);
     expect(onConnectionStateChange).toHaveBeenCalledWith('connected');
+    await session.close();
+  });
+
+  it('reports asynchronous ICE delivery failures instead of leaving a rejected promise', async () => {
+    getUserMedia.mockResolvedValue(makeStream([]));
+    onSignal.mockRejectedValueOnce(new Error('SIGNALING_DELIVERY_FAILED'));
+    const session = await createPeerSession(makeOptions());
+    const peerConnection = FakePeerConnection.instances[0];
+    const candidate = {
+      toJSON: () => ({
+        candidate: 'candidate:1 1 UDP 1 192.0.2.1 5000 typ host',
+        sdpMid: '0',
+        sdpMLineIndex: 0,
+      }),
+    };
+
+    peerConnection?.onicecandidate?.({ candidate } as RTCPeerConnectionIceEvent);
+    await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'SIGNALING_DELIVERY_FAILED',
+    }));
     await session.close();
   });
 

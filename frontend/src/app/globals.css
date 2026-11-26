@@ -112,6 +112,52 @@ a {
     color: #ad2c2c;
 }
 
+.video-stage {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.video-stage > div {
+    min-width: 0;
+}
+
+.video-stage h2 {
+    font-size: 0.95rem;
+}
+
+.video-stage video {
+    display: block;
+    width: 100%;
+    min-height: 12rem;
+    aspect-ratio: 16 / 9;
+    border-radius: 0.75rem;
+    background: #101725;
+    object-fit: cover;
+}
+
+.call-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.call-controls button {
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    border: 1px solid #d5deed;
+    border-radius: 0.65rem;
+    background: #fff;
+    color: #172033;
+    cursor: pointer;
+}
+
+.call-controls button:last-child {
+    border-color: #ad2c2c;
+    color: #ad2c2c;
+}
+
 .sr-only {
     position: absolute;
     width: 1px;
@@ -134,5 +180,9 @@ a {
     .call-shell {
         padding: 1.5rem;
         border-radius: 1rem;
+    }
+
+    .video-stage {
+        grid-template-columns: 1fr;
     }
 }

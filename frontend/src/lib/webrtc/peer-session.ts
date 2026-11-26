@@ -13,6 +13,7 @@ export type PeerSessionOptions = {
   onSignal: (signal: ClientSignal) => void | Promise<void>;
   onRemoteStream: (stream: MediaStream) => void;
   onConnectionStateChange: (state: RTCPeerConnectionState) => void;
+  onError: (error: Error) => void;
 };
 
 export type PeerSession = {
@@ -74,7 +75,11 @@ export async function createPeerSession(options: PeerSessionOptions): Promise<Pe
           sdpMLineIndex: candidate.sdpMLineIndex ?? null,
         },
       };
-      void options.onSignal(ClientSignalSchema.parse(message));
+      void Promise.resolve(options.onSignal(ClientSignalSchema.parse(message))).catch(
+        (error: unknown) => {
+          options.onError(error instanceof Error ? error : new Error('SIGNALING_DELIVERY_FAILED'));
+        },
+      );
     };
 
     peerConnection.ontrack = (event) => {
