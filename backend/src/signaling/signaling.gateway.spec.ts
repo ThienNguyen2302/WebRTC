@@ -58,6 +58,7 @@ describe('SignalingGateway', () => {
   let gateway: SignalingGateway;
   let roomsService: {
     verifyInvite: ReturnType<typeof vi.fn>;
+    assertWaitingRoom: ReturnType<typeof vi.fn>;
     activateRoom: ReturnType<typeof vi.fn>;
     closeRoom: ReturnType<typeof vi.fn>;
   };
@@ -71,6 +72,7 @@ describe('SignalingGateway', () => {
         status: 'WAITING',
         expiresAt: new Date('2099-01-01T00:00:00.000Z'),
       })),
+      assertWaitingRoom: vi.fn().mockResolvedValue(undefined),
       activateRoom: vi.fn().mockResolvedValue(undefined),
       closeRoom: vi.fn().mockResolvedValue(undefined),
     };
@@ -136,6 +138,54 @@ describe('SignalingGateway', () => {
     expect(third.received('roomError')).toEqual([
       { type: 'roomError', code: 'ROOM_FULL' },
     ]);
+    expect(roomsService.activateRoom).toHaveBeenCalledOnce();
+  });
+
+  it('does not admit the first participant if expiry wins after invite verification', async () => {
+    roomsService.assertWaitingRoom.mockRejectedValueOnce(new RoomServiceError('ROOM_EXPIRED'));
+    const socket = createSocket('socket-a');
+
+    await gateway.joinRoom(socket, joinRequest());
+
+    expect(roomsService.assertWaitingRoom).toHaveBeenCalledWith(roomId);
+    expect(socket.received('roomError')).toEqual([
+      { type: 'roomError', code: 'ROOM_EXPIRED' },
+    ]);
+    expect(socket.received('joined')).toHaveLength(0);
+    expect(roomsService.activateRoom).not.toHaveBeenCalled();
+  });
+
+  it('does not admit the second participant if expiry wins before activation', async () => {
+    const first = createSocket('socket-a');
+    const second = createSocket('socket-b');
+    await gateway.joinRoom(first, joinRequest());
+    roomsService.activateRoom.mockRejectedValueOnce(new RoomServiceError('ROOM_EXPIRED'));
+
+    await gateway.joinRoom(second, joinRequest());
+
+    expect(second.received('roomError')).toEqual([
+      { type: 'roomError', code: 'ROOM_EXPIRED' },
+    ]);
+    expect(second.received('joined')).toHaveLength(0);
+    expect(first.received('peerJoined')).toHaveLength(0);
+    expect(first.received('roomClosed')).toEqual([
+      { type: 'roomClosed', reason: 'ROOM_EXPIRED' },
+    ]);
+  });
+
+  it('uses the updated presence state when first joins race each other', async () => {
+    const first = createSocket('socket-a');
+    const second = createSocket('socket-b');
+
+    await Promise.all([
+      gateway.joinRoom(first, joinRequest()),
+      gateway.joinRoom(second, joinRequest()),
+    ]);
+
+    expect([first, second].flatMap((socket) => socket.received('joined'))).toHaveLength(2);
+    expect([first, second].flatMap((socket) => socket.received('joined')).filter(
+      (joined) => (joined as { offerer: boolean }).offerer,
+    )).toHaveLength(1);
     expect(roomsService.activateRoom).toHaveBeenCalledOnce();
   });
 

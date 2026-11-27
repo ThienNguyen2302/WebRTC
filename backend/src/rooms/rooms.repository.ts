@@ -35,11 +35,22 @@ export class RoomsRepository {
     return this.prisma.room.findUnique({ where: { id } });
   }
 
-  async activate(id: string): Promise<RoomRecord> {
-    return this.prisma.room.update({
-      where: { id },
+  async assertWaiting(id: string, now = new Date()): Promise<boolean> {
+    const result = await this.prisma.room.updateMany({
+      where: { id, status: 'WAITING', expiresAt: { gt: now } },
+      data: { status: 'WAITING' },
+    });
+
+    return result.count === 1;
+  }
+
+  async activate(id: string, now = new Date()): Promise<boolean> {
+    const result = await this.prisma.room.updateMany({
+      where: { id, status: 'WAITING', expiresAt: { gt: now } },
       data: { status: 'ACTIVE' },
     });
+
+    return result.count === 1;
   }
 
   async close(id: string, status: 'CLOSED' | 'EXPIRED'): Promise<RoomRecord> {

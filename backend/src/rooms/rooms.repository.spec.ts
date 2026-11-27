@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { RoomsRepository } from './rooms.repository';
@@ -38,6 +38,10 @@ describe('RoomsRepository', () => {
     repository = module.get<RoomsRepository>(RoomsRepository);
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('persists only temporary room metadata', async () => {
     prisma.room.create.mockResolvedValue({
       id: '2d9c6d8a-5c6c-48b8-b4fa-dc3ccdb88a2d',
@@ -64,13 +68,17 @@ describe('RoomsRepository', () => {
 
   it('activates and closes a room idempotently', async () => {
     const roomId = '2d9c6d8a-5c6c-48b8-b4fa-dc3ccdb88a2d';
+    const now = new Date('2026-11-26T10:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    prisma.room.updateMany.mockResolvedValue({ count: 1 });
     prisma.room.update.mockResolvedValue({});
 
     await repository.activate(roomId);
     await repository.close(roomId, 'CLOSED');
 
-    expect(prisma.room.update).toHaveBeenCalledWith({
-      where: { id: roomId },
+    expect(prisma.room.updateMany).toHaveBeenCalledWith({
+      where: { id: roomId, status: 'WAITING', expiresAt: { gt: now } },
       data: { status: 'ACTIVE' },
     });
     expect(prisma.room.update).toHaveBeenCalledWith({
@@ -79,6 +87,21 @@ describe('RoomsRepository', () => {
         status: 'CLOSED',
         closedAt: expect.any(Date),
       },
+    });
+  });
+
+  it('claims a first participant slot only while the room is unexpired and waiting', async () => {
+    const roomId = '2d9c6d8a-5c6c-48b8-b4fa-dc3ccdb88a2d';
+    const now = new Date('2026-11-26T10:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    prisma.room.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(repository.assertWaiting(roomId)).resolves.toBe(false);
+
+    expect(prisma.room.updateMany).toHaveBeenCalledWith({
+      where: { id: roomId, status: 'WAITING', expiresAt: { gt: now } },
+      data: { status: 'WAITING' },
     });
   });
 

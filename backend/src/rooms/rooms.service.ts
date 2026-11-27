@@ -69,8 +69,16 @@ export class RoomsService implements OnModuleInit {
         return room;
     }
 
+    async assertWaitingRoom(roomId: string): Promise<void> {
+        if (!(await this.roomsRepository.assertWaiting(roomId))) {
+            throw new RoomServiceError('ROOM_EXPIRED');
+        }
+    }
+
     async activateRoom(roomId: string): Promise<void> {
-        await this.roomsRepository.activate(roomId);
+        if (!(await this.roomsRepository.activate(roomId))) {
+            throw new RoomServiceError('ROOM_EXPIRED');
+        }
     }
 
     async closeRoom(roomId: string, status: 'CLOSED' | 'EXPIRED' = 'CLOSED'): Promise<void> {

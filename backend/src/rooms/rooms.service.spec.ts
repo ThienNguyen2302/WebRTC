@@ -8,6 +8,7 @@ describe('RoomsService', () => {
     const repo = {
         create: vi.fn(),
         findById: vi.fn(),
+        assertWaiting: vi.fn(),
         activate: vi.fn(),
         close: vi.fn(),
         markExpired: vi.fn(),
@@ -126,6 +127,18 @@ describe('RoomsService', () => {
         await expect(service.verifyInvite(roomId, validSecret)).resolves.toMatchObject({ id: roomId });
 
         expect(repo.activate).not.toHaveBeenCalled();
+    });
+
+    it('rejects admission when the waiting-room claim loses an expiry race', async () => {
+        repo.assertWaiting.mockResolvedValue(false);
+
+        await expect(service.assertWaitingRoom(roomId)).rejects.toMatchObject({ code: 'ROOM_EXPIRED' });
+    });
+
+    it('rejects activation when the room is no longer waiting and unexpired', async () => {
+        repo.activate.mockResolvedValue(false);
+
+        await expect(service.activateRoom(roomId)).rejects.toMatchObject({ code: 'ROOM_EXPIRED' });
     });
 
     it('does not expire an active room when the waiting-room TTL has passed', async () => {

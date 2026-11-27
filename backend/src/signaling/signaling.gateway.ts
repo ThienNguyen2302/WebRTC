@@ -102,7 +102,23 @@ export class SignalingGateway implements OnGatewayDisconnect, OnModuleDestroy {
       return;
     }
 
-    const roomState = state ?? this.presence.create(request.roomId);
+    if (!state || state.participants.length === 0) {
+      try {
+        await this.roomsService.assertWaitingRoom(request.roomId);
+      } catch (error) {
+        if (!(error instanceof RoomServiceError)) {
+          throw error;
+        }
+
+        this.emitRoomError(client, error.code);
+        if (error.code === 'ROOM_EXPIRED') {
+          this.cleanupPresence(request.roomId, 'ROOM_EXPIRED');
+        }
+        return;
+      }
+    }
+
+    const roomState = this.presence.get(request.roomId) ?? this.presence.create(request.roomId);
     if (roomState.participants.length >= 2 || roomState.closing) {
       this.emitRoomError(client, 'ROOM_FULL');
       return;
@@ -124,6 +140,9 @@ export class SignalingGateway implements OnGatewayDisconnect, OnModuleDestroy {
         this.presence.removeParticipant(request.roomId, participant);
         if (error instanceof RoomServiceError) {
           this.emitRoomError(client, error.code);
+          if (error.code === 'ROOM_EXPIRED') {
+            this.cleanupPresence(request.roomId, 'ROOM_EXPIRED');
+          }
           return;
         }
         throw error;
